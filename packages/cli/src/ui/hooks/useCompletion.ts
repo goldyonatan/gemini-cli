@@ -383,30 +383,33 @@ export function useCompletion(
         respectGeminiIgnore?: boolean;
       },
       maxResults = 50,
+      startDir = cwd,
     ): Promise<Suggestion[]> => {
       const globPattern = `**/${searchPrefix}*`;
       const files = await glob(globPattern, {
-        cwd,
+        cwd: startDir,
         dot: searchPrefix.startsWith('.'),
         nocase: true,
+        mark: true, // Add '/' to directories
       });
 
       const suggestions: Suggestion[] = files
-        .map((file: string) => {
-          const relativePath = path.relative(cwd, file);
-          return {
-            label: relativePath,
-            value: escapePath(relativePath),
-          };
-        })
-        .filter((s) => {
+        .filter((file: string) => {
           if (fileDiscoveryService) {
+            const absolutePath = path.resolve(startDir, file);
+            const pathFromRoot = path.relative(cwd, absolutePath);
             return !fileDiscoveryService.shouldIgnoreFile(
-              s.label,
+              pathFromRoot,
               filterOptions,
-            ); // relative path
+            );
           }
           return true;
+        })
+        .map((file: string) => {
+          const finalPath = file.replace(/\\/g, '/');
+          const value = escapePath(finalPath);
+          const label = path.join(baseDirRelative, finalPath).replace(/\\/g, '/');
+          return { label, value };
         })
         .slice(0, maxResults);
 
@@ -425,23 +428,14 @@ export function useCompletion(
 
       try {
         // If there's no slash, or it's the root, do a recursive search from cwd
-        if (
-          partialPath.indexOf('/') === -1 &&
-          prefix &&
-          enableRecursiveSearch
-        ) {
+        if (prefix && enableRecursiveSearch) {
           if (fileDiscoveryService) {
             fetchedSuggestions = await findFilesWithGlob(
               prefix,
               fileDiscoveryService,
               filterOptions,
-            );
-          } else {
-            fetchedSuggestions = await findFilesRecursively(
-              cwd,
-              prefix,
-              fileDiscoveryService,
-              filterOptions,
+              50,
+              baseDirAbsolute,
             );
           }
         } else {

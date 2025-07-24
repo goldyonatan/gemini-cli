@@ -18,7 +18,7 @@ import { useCompletion } from '../hooks/useCompletion.js';
 import { useKeypress, Key } from '../hooks/useKeypress.js';
 import { isAtCommand, isSlashCommand } from '../utils/commandUtils.js';
 import { CommandContext, SlashCommand } from '../commands/types.js';
-import { Config } from '@google/gemini-cli-core';
+import { Config, unescapePath } from '@google/gemini-cli-core';
 import {
   clipboardHasImage,
   saveClipboardImage,
@@ -166,7 +166,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return;
       }
       const query = buffer.text;
-      const suggestion = completionSuggestions[indexToUse].value;
+      const suggestion = unescapePath(completionSuggestions[indexToUse].value);
 
       if (query.trimStart().startsWith('/')) {
         const hasTrailingSpace = query.endsWith(' ');
@@ -214,21 +214,42 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       } else {
         const atIndex = query.lastIndexOf('@');
         if (atIndex === -1) return;
+
+        // Reconstruct the path with the new suggestion for normalization.
         const pathPart = query.substring(atIndex + 1);
-        const lastSlashIndexInPath = pathPart.lastIndexOf('/');
-        let autoCompleteStartIndex = atIndex + 1;
-        if (lastSlashIndexInPath !== -1) {
-          autoCompleteStartIndex += lastSlashIndexInPath + 1;
+        const lastSlashIndex = pathPart.lastIndexOf('/');
+        const textBeforeCompletion =
+          lastSlashIndex === -1
+            ? ''
+            : pathPart.substring(0, lastSlashIndex + 1);
+
+        const newUnresolvedPath = textBeforeCompletion + suggestion;
+
+        // Resolve and simplify the path.
+        const targetDir = config.getTargetDir();
+        const resolvedPath = path.resolve(targetDir, newUnresolvedPath);
+        let finalPath = path
+          .relative(targetDir, resolvedPath)
+          .replace(/\\/g, '/');
+
+        // path.relative returns '.' if the path is the target directory itself.
+        if (finalPath === '.') {
+          finalPath = '';
         }
-        buffer.replaceRangeByOffset(
-          autoCompleteStartIndex,
-          buffer.text.length,
-          suggestion,
-        );
+
+        // Check if the original suggestion was for a directory to preserve trailing slash.
+        const suggestionData = completionSuggestions[indexToUse];
+        const isDirectory = suggestionData.value.endsWith('/');
+        if (isDirectory && finalPath && !finalPath.endsWith('/')) {
+          finalPath += '/';
+        }
+
+        // Replace the entire path part with the new, simplified path.
+        buffer.replaceRangeByOffset(atIndex + 1, query.length, finalPath);
       }
       resetCompletionState();
     },
-    [resetCompletionState, buffer, completionSuggestions, slashCommands],
+    [resetCompletionState, buffer, completionSuggestions, slashCommands, config],
   );
 
   // Handle clipboard image pasting with Ctrl+V
@@ -340,6 +361,52 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
               handleAutocomplete(targetIndex);
             }
           }
+          return;
+        }
+
+        // Alt+Backspace for path navigation
+        if (key.meta && key.name === 'backspace') {
+          if (isAtCommand(buffer.text)) {
+            const query = buffer.text;
+            const atIndex = query.lastIndexOf('@');
+
+            if (atIndex !== -1) {
+              const pathPart = query.substring(atIndex + 1);
+              // Regex to check if the path is exclusively ../ sequences.
+              const isOnlyRelativeUps = /^(\.\.\/)+$/.test(pathPart);
+
+              if (pathPart === '' || isOnlyRelativeUps) {
+                // Mode 1: Path is empty or consists only of ../ sequences.
+                // Prepend another '../' to go up further.
+                buffer.replaceRangeByOffset(atIndex + 1, atIndex + 1, '../');
+                // After prepending, move cursor to the end of the line.
+                buffer.move('end');
+              } else {
+                // Mode 2: It's a regular path, so navigate up one directory level.
+                let currentPath = pathPart;
+                // Normalize by removing a trailing slash for calculations
+                if (currentPath.endsWith('/')) {
+                  currentPath = currentPath.slice(0, -1);
+                }
+
+                const segments = currentPath.split('/');
+                segments.pop();
+
+                let newPathPart = segments.join('/');
+                // Add a trailing slash back if there's content left.
+                if (newPathPart && !newPathPart.endsWith('/')) {
+                  newPathPart += '/';
+                }
+
+                buffer.replaceRangeByOffset(
+                  atIndex + 1,
+                  query.length,
+                  newPathPart,
+                );
+              }
+            }
+          }
+          // Consume the keypress, preventing default backspace.
           return;
         }
       }
