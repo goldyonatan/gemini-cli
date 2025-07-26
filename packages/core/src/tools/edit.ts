@@ -57,6 +57,11 @@ export interface EditToolParams {
    * Whether the edit was modified manually by the user.
    */
   modified_by_user?: boolean;
+
+  /**
+   * Whether to allow writing outside the root directory.
+   */
+  allow_outside_cwd?: boolean;
 }
 
 interface CalculatedEdit {
@@ -115,6 +120,11 @@ Expectation for required parameters:
               'Number of replacements expected. Defaults to 1 if not specified. Use when you want to replace multiple occurrences.',
             minimum: 1,
           },
+          allow_outside_cwd: {
+            description:
+              'Whether to allow writing to a path outside the current working directory. Defaults to false.',
+            type: Type.BOOLEAN,
+          },
         },
         required: ['file_path', 'old_string', 'new_string'],
         type: Type.OBJECT,
@@ -137,7 +147,10 @@ Expectation for required parameters:
       return `File path must be absolute: ${params.file_path}`;
     }
 
-    if (!isWithinRoot(params.file_path, this.config.getTargetDir())) {
+    if (
+      !params.allow_outside_cwd &&
+      !isWithinRoot(params.file_path, this.config.getTargetDir())
+    ) {
       return `File path must be within the root directory (${this.config.getTargetDir()}): ${params.file_path}`;
     }
 

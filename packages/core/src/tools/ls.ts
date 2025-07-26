@@ -23,6 +23,11 @@ export interface LSToolParams {
   path: string;
 
   /**
+   * Whether to allow listing files outside the root directory.
+   */
+  allow_outside_cwd?: boolean;
+
+  /**
    * Array of glob patterns to ignore (optional)
    */
   ignore?: string[];
@@ -92,6 +97,11 @@ export class LSTool extends BaseTool<LSToolParams, ToolResult> {
             },
             type: Type.ARRAY,
           },
+          allow_outside_cwd: {
+            description:
+              'Whether to allow listing files outside the current working directory. Defaults to false.',
+            type: Type.BOOLEAN,
+          },
           file_filtering_options: {
             description:
               'Optional: Whether to respect ignore patterns from .gitignore or .geminiignore',
@@ -129,7 +139,10 @@ export class LSTool extends BaseTool<LSToolParams, ToolResult> {
     if (!path.isAbsolute(params.path)) {
       return `Path must be absolute: ${params.path}`;
     }
-    if (!isWithinRoot(params.path, this.config.getTargetDir())) {
+    if (
+      !params.allow_outside_cwd &&
+      !isWithinRoot(params.path, this.config.getTargetDir())
+    ) {
       return `Path must be within the root directory (${this.config.getTargetDir()}): ${params.path}`;
     }
     return null;

@@ -297,83 +297,83 @@ export function useCompletion(
 
     let isMounted = true;
 
-    const findFilesRecursively = async (
-      startDir: string,
-      searchPrefix: string,
-      fileDiscovery: FileDiscoveryService | null,
-      filterOptions: {
-        respectGitIgnore?: boolean;
-        respectGeminiIgnore?: boolean;
-      },
-      currentRelativePath = '',
-      depth = 0,
-      maxDepth = 10, // Limit recursion depth
-      maxResults = 50, // Limit number of results
-    ): Promise<Suggestion[]> => {
-      if (depth > maxDepth) {
-        return [];
-      }
+    // const findFilesRecursively = async (
+    //   startDir: string,
+    //   searchPrefix: string,
+    //   fileDiscovery: FileDiscoveryService | null,
+    //   filterOptions: {
+    //     respectGitIgnore?: boolean;
+    //     respectGeminiIgnore?: boolean;
+    //   },
+    //   currentRelativePath = '',
+    //   depth = 0,
+    //   maxDepth = 10, // Limit recursion depth
+    //   maxResults = 50, // Limit number of results
+    // ): Promise<Suggestion[]> => {
+    //   if (depth > maxDepth) {
+    //     return [];
+    //   }
 
-      const lowerSearchPrefix = searchPrefix.toLowerCase();
-      let foundSuggestions: Suggestion[] = [];
-      try {
-        const entries = await fs.readdir(startDir, { withFileTypes: true });
-        for (const entry of entries) {
-          if (foundSuggestions.length >= maxResults) break;
+    //   const lowerSearchPrefix = searchPrefix.toLowerCase();
+    //   let foundSuggestions: Suggestion[] = [];
+    //   try {
+    //     const entries = await fs.readdir(startDir, { withFileTypes: true });
+    //     for (const entry of entries) {
+    //       if (foundSuggestions.length >= maxResults) break;
 
-          const entryPathRelative = path.join(currentRelativePath, entry.name);
-          const entryPathFromRoot = path.relative(
-            cwd,
-            path.join(startDir, entry.name),
-          );
+    //       const entryPathRelative = path.join(currentRelativePath, entry.name);
+    //       const entryPathFromRoot = path.relative(
+    //         cwd,
+    //         path.join(startDir, entry.name),
+    //       );
 
-          // Conditionally ignore dotfiles
-          if (!searchPrefix.startsWith('.') && entry.name.startsWith('.')) {
-            continue;
-          }
+    //       // Conditionally ignore dotfiles
+    //       if (!searchPrefix.startsWith('.') && entry.name.startsWith('.')) {
+    //         continue;
+    //       }
 
-          // Check if this entry should be ignored by filtering options
-          if (
-            fileDiscovery &&
-            fileDiscovery.shouldIgnoreFile(entryPathFromRoot, filterOptions)
-          ) {
-            continue;
-          }
+    //       // Check if this entry should be ignored by filtering options
+    //       if (
+    //         fileDiscovery &&
+    //         fileDiscovery.shouldIgnoreFile(entryPathFromRoot, filterOptions)
+    //       ) {
+    //         continue;
+    //       }
 
-          if (entry.name.toLowerCase().startsWith(lowerSearchPrefix)) {
-            foundSuggestions.push({
-              label: entryPathRelative + (entry.isDirectory() ? '/' : ''),
-              value: escapePath(
-                entryPathRelative + (entry.isDirectory() ? '/' : ''),
-              ),
-            });
-          }
-          if (
-            entry.isDirectory() &&
-            entry.name !== 'node_modules' &&
-            !entry.name.startsWith('.')
-          ) {
-            if (foundSuggestions.length < maxResults) {
-              foundSuggestions = foundSuggestions.concat(
-                await findFilesRecursively(
-                  path.join(startDir, entry.name),
-                  searchPrefix, // Pass original searchPrefix for recursive calls
-                  fileDiscovery,
-                  filterOptions,
-                  entryPathRelative,
-                  depth + 1,
-                  maxDepth,
-                  maxResults - foundSuggestions.length,
-                ),
-              );
-            }
-          }
-        }
-      } catch (_err) {
-        // Ignore errors like permission denied or ENOENT during recursive search
-      }
-      return foundSuggestions.slice(0, maxResults);
-    };
+    //       if (entry.name.toLowerCase().startsWith(lowerSearchPrefix)) {
+    //         foundSuggestions.push({
+    //           label: entryPathRelative + (entry.isDirectory() ? '/' : ''),
+    //           value: escapePath(
+    //             entryPathRelative + (entry.isDirectory() ? '/' : ''),
+    //           ),
+    //         });
+    //       }
+    //       if (
+    //         entry.isDirectory() &&
+    //         entry.name !== 'node_modules' &&
+    //         !entry.name.startsWith('.')
+    //       ) {
+    //         if (foundSuggestions.length < maxResults) {
+    //           foundSuggestions = foundSuggestions.concat(
+    //             await findFilesRecursively(
+    //               path.join(startDir, entry.name),
+    //               searchPrefix, // Pass original searchPrefix for recursive calls
+    //               fileDiscovery,
+    //               filterOptions,
+    //               entryPathRelative,
+    //               depth + 1,
+    //               maxDepth,
+    //               maxResults - foundSuggestions.length,
+    //             ),
+    //           );
+    //         }
+    //       }
+    //     }
+    //   } catch (_err) {
+    //     // Ignore errors like permission denied or ENOENT during recursive search
+    //   }
+    //   return foundSuggestions.slice(0, maxResults);
+    // };
 
     const findFilesWithGlob = async (
       searchPrefix: string,
@@ -408,7 +408,9 @@ export function useCompletion(
         .map((file: string) => {
           const finalPath = file.replace(/\\/g, '/');
           const value = escapePath(finalPath);
-          const label = path.join(baseDirRelative, finalPath).replace(/\\/g, '/');
+          const label = path
+            .join(baseDirRelative, finalPath)
+            .replace(/\\/g, '/');
           return { label, value };
         })
         .slice(0, maxResults);

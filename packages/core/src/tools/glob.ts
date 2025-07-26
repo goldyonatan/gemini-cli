@@ -73,6 +73,11 @@ export interface GlobToolParams {
    * Whether to respect .gitignore patterns (optional, defaults to true)
    */
   respect_git_ignore?: boolean;
+
+  /**
+   * Whether to allow searching outside the root directory.
+   */
+  allow_outside_cwd?: boolean;
 }
 
 /**
@@ -109,6 +114,11 @@ export class GlobTool extends BaseTool<GlobToolParams, ToolResult> {
               'Optional: Whether to respect .gitignore patterns when finding files. Only available in git repositories. Defaults to true.',
             type: Type.BOOLEAN,
           },
+          allow_outside_cwd: {
+            description:
+              'Whether to allow searching outside the current working directory. Defaults to false.',
+            type: Type.BOOLEAN,
+          },
         },
         required: ['pattern'],
         type: Type.OBJECT,
@@ -130,7 +140,10 @@ export class GlobTool extends BaseTool<GlobToolParams, ToolResult> {
       params.path || '.',
     );
 
-    if (!isWithinRoot(searchDirAbsolute, this.config.getTargetDir())) {
+    if (
+      !params.allow_outside_cwd &&
+      !isWithinRoot(searchDirAbsolute, this.config.getTargetDir())
+    ) {
       return `Search path ("${searchDirAbsolute}") resolves outside the tool's root directory ("${this.config.getTargetDir()}").`;
     }
 

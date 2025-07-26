@@ -30,6 +30,11 @@ export interface ReadFileToolParams {
   absolute_path: string;
 
   /**
+   * Whether to allow reading a file outside the root directory.
+   */
+  allow_outside_cwd?: boolean;
+
+  /**
    * The line number to start reading from (optional)
    */
   offset?: number;
@@ -69,6 +74,11 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
               "Optional: For text files, maximum number of lines to read. Use with 'offset' to paginate through large files. If omitted, reads the entire file (if feasible, up to a default limit).",
             type: Type.NUMBER,
           },
+          allow_outside_cwd: {
+            description:
+              'Whether to allow reading a file outside the current working directory. Defaults to false.',
+            type: Type.BOOLEAN,
+          },
         },
         required: ['absolute_path'],
         type: Type.OBJECT,
@@ -86,7 +96,10 @@ export class ReadFileTool extends BaseTool<ReadFileToolParams, ToolResult> {
     if (!path.isAbsolute(filePath)) {
       return `File path must be absolute, but was relative: ${filePath}. You must provide an absolute path.`;
     }
-    if (!isWithinRoot(filePath, this.config.getTargetDir())) {
+    if (
+      !params.allow_outside_cwd &&
+      !isWithinRoot(filePath, this.config.getTargetDir())
+    ) {
       return `File path must be within the root directory (${this.config.getTargetDir()}): ${filePath}`;
     }
     if (params.offset !== undefined && params.offset < 0) {

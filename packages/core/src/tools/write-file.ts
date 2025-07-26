@@ -51,6 +51,11 @@ export interface WriteFileToolParams {
    * Whether the proposed content was modified by the user.
    */
   modified_by_user?: boolean;
+
+  /**
+   * Whether to allow writing outside the root directory.
+   */
+  allow_outside_cwd?: boolean;
 }
 
 interface GetCorrectedFileContentResult {
@@ -88,6 +93,11 @@ export class WriteFileTool
             description: 'The content to write to the file.',
             type: Type.STRING,
           },
+          allow_outside_cwd: {
+            description:
+              'Whether to allow writing to a path outside the current working directory. Defaults to false.',
+            type: Type.BOOLEAN,
+          },
         },
         required: ['file_path', 'content'],
         type: Type.OBJECT,
@@ -105,7 +115,10 @@ export class WriteFileTool
     if (!path.isAbsolute(filePath)) {
       return `File path must be absolute: ${filePath}`;
     }
-    if (!isWithinRoot(filePath, this.config.getTargetDir())) {
+    if (
+      !params.allow_outside_cwd &&
+      !isWithinRoot(filePath, this.config.getTargetDir())
+    ) {
       return `File path must be within the root directory (${this.config.getTargetDir()}): ${filePath}`;
     }
 

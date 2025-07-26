@@ -38,6 +38,11 @@ export interface GrepToolParams {
    * File pattern to include in the search (e.g. "*.js", "*.{ts,tsx}")
    */
   include?: string;
+
+  /**
+   * Whether to allow searching outside the root directory.
+   */
+  allow_outside_cwd?: boolean;
 }
 
 /**
@@ -80,6 +85,11 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
               "Optional: A glob pattern to filter which files are searched (e.g., '*.js', '*.{ts,tsx}', 'src/**'). If omitted, searches all files (respecting potential global ignores).",
             type: Type.STRING,
           },
+          allow_outside_cwd: {
+            description:
+              'Whether to allow searching outside the current working directory. Defaults to false.',
+            type: Type.BOOLEAN,
+          },
         },
         required: ['pattern'],
         type: Type.OBJECT,
@@ -91,23 +101,26 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
 
   /**
    * Checks if a path is within the root directory and resolves it.
-   * @param relativePath Path relative to the root directory (or undefined for root).
+   * @param params The full GrepToolParams object.
    * @returns The absolute path if valid and exists.
    * @throws {Error} If path is outside root, doesn't exist, or isn't a directory.
    */
-  private resolveAndValidatePath(relativePath?: string): string {
+  private resolveAndValidatePath(params: GrepToolParams): string {
     const targetPath = path.resolve(
       this.config.getTargetDir(),
-      relativePath || '.',
+      params.path || '.',
     );
 
     // Security Check: Ensure the resolved path is still within the root directory.
     if (
+      !params.allow_outside_cwd &&
       !targetPath.startsWith(this.config.getTargetDir()) &&
       targetPath !== this.config.getTargetDir()
     ) {
       throw new Error(
-        `Path validation failed: Attempted path "${relativePath || '.'}" resolves outside the allowed root directory "${this.config.getTargetDir()}".`,
+        `Path validation failed: Attempted path "${
+          params.path || '.'
+        }" resolves outside the allowed root directory "${this.config.getTargetDir()}".`,
       );
     }
 
@@ -147,7 +160,7 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
     }
 
     try {
-      this.resolveAndValidatePath(params.path);
+      this.resolveAndValidatePath(params);
     } catch (error) {
       return getErrorMessage(error);
     }
@@ -176,7 +189,7 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
 
     let searchDirAbs: string;
     try {
-      searchDirAbs = this.resolveAndValidatePath(params.path);
+      searchDirAbs = this.resolveAndValidatePath(params);
       const searchDirDisplay = params.path || '.';
 
       const matches: GrepMatch[] = await this.performGrepSearch({

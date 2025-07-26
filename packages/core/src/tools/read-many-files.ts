@@ -15,6 +15,7 @@ import {
   processSingleFileContent,
   DEFAULT_ENCODING,
   getSpecificMimeType,
+  isWithinRoot,
 } from '../utils/fileUtils.js';
 import { PartListUnion, Schema, Type } from '@google/genai';
 import { Config, DEFAULT_FILE_FILTERING_OPTIONS } from '../config/config.js';
@@ -60,6 +61,11 @@ export interface ReadManyFilesParams {
    * Optional. Apply default exclusion patterns. Defaults to true.
    */
   useDefaultExcludes?: boolean;
+
+  /**
+   * Whether to allow reading files outside the root directory.
+   */
+  allow_outside_cwd?: boolean;
 
   /**
    * Whether to respect .gitignore and .geminiignore patterns (optional, defaults to true)
@@ -173,6 +179,11 @@ export class ReadManyFilesTool extends BaseTool<
           description:
             'Optional. Whether to apply a list of default exclusion patterns (e.g., node_modules, .git, binary files). Defaults to true.',
           default: true,
+        },
+        allow_outside_cwd: {
+          type: Type.BOOLEAN,
+          description:
+            'Whether to allow reading files outside the current working directory. Defaults to false.',
         },
         file_filtering_options: {
           description:
@@ -347,7 +358,10 @@ Use this tool when the user's query implies needing the content of several files
 
       for (const absoluteFilePath of entries) {
         // Security check: ensure the glob library didn't return something outside targetDir.
-        if (!absoluteFilePath.startsWith(this.config.getTargetDir())) {
+        if (
+          !params.allow_outside_cwd &&
+          !isWithinRoot(absoluteFilePath, this.config.getTargetDir())
+        ) {
           skippedFiles.push({
             path: absoluteFilePath,
             reason: `Security: Glob library returned path outside target directory. Base: ${this.config.getTargetDir()}, Path: ${absoluteFilePath}`,

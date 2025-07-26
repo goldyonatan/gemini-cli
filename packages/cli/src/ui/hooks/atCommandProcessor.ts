@@ -394,8 +394,16 @@ export async function handleAtCommand({
       respect_git_ignore: respectFileIgnore.respectGitIgnore,
       respect_gemini_ignore: respectFileIgnore.respectGeminiIgnore,
     },
-    // Use configuration setting
+    allow_outside_cwd: false, // Default to false for security
   };
+
+  // If any path starts with ../, allow the tool to go outside the CWD.
+  if (
+    pathSpecsToRead.some((p) => p.startsWith('../') || p.startsWith('..\\'))
+  ) {
+    toolArgs.allow_outside_cwd = true;
+  }
+
   let toolCallDisplay: IndividualToolCallDisplay;
 
   try {

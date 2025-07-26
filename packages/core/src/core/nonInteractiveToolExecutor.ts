@@ -24,6 +24,35 @@ export async function executeToolCall(
   toolRegistry: ToolRegistry,
   abortSignal?: AbortSignal,
 ): Promise<ToolCallResponseInfo> {
+  // A map of tool names to the name of their path parameter.
+  const toolPathParams: Record<string, string> = {
+    write_file: 'file_path',
+    replace: 'file_path',
+    read_file: 'absolute_path',
+    list_directory: 'path',
+    search_file_content: 'path',
+    glob: 'path',
+    read_many_files: 'paths',
+  };
+
+  const pathParamName = toolPathParams[toolCallRequest.name];
+  if (pathParamName && toolCallRequest.args[pathParamName]) {
+    const pathValue = toolCallRequest.args[pathParamName];
+
+    // Check if any path in the array starts with ../
+    const pathsToCheck = Array.isArray(pathValue) ? pathValue : [pathValue];
+
+    for (const p of pathsToCheck) {
+      if (
+        typeof p === 'string' &&
+        (p.startsWith('../') || p.startsWith('..\\'))
+      ) {
+        toolCallRequest.args.allow_outside_cwd = true;
+        break; // Found one, no need to check further
+      }
+    }
+  }
+
   const tool = toolRegistry.getTool(toolCallRequest.name);
 
   const startTime = Date.now();

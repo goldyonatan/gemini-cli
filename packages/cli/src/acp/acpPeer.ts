@@ -230,6 +230,35 @@ class GeminiAgent implements Agent {
       return errorResponse(new Error('Missing function name'));
     }
 
+    // A map of tool names to the name of their path parameter.
+    const toolPathParams: Record<string, string> = {
+      write_file: 'file_path',
+      replace: 'file_path',
+      read_file: 'absolute_path',
+      list_directory: 'path',
+      search_file_content: 'path',
+      glob: 'path',
+      read_many_files: 'paths',
+    };
+
+    const pathParamName = toolPathParams[fc.name];
+    if (pathParamName && args[pathParamName]) {
+      const pathValue = args[pathParamName];
+
+      // Check if any path in the array starts with ../
+      const pathsToCheck = Array.isArray(pathValue) ? pathValue : [pathValue];
+
+      for (const p of pathsToCheck) {
+        if (
+          typeof p === 'string' &&
+          (p.startsWith('../') || p.startsWith('..\\'))
+        ) {
+          args.allow_outside_cwd = true;
+          break; // Found one, no need to check further
+        }
+      }
+    }
+
     const toolRegistry: ToolRegistry = await this.config.getToolRegistry();
     const tool = toolRegistry.getTool(fc.name as string);
 
@@ -381,7 +410,11 @@ class GeminiAgent implements Agent {
 
       try {
         const absolutePath = path.resolve(this.config.getTargetDir(), pathName);
-        if (isWithinRoot(absolutePath, this.config.getTargetDir())) {
+        if (
+          pathName.startsWith('../') ||
+          pathName.startsWith('..\\') ||
+          isWithinRoot(absolutePath, this.config.getTargetDir())
+        ) {
           const stats = await fs.stat(absolutePath);
           if (stats.isDirectory()) {
             currentPathSpec = pathName.endsWith('/')
@@ -528,7 +561,15 @@ class GeminiAgent implements Agent {
     const toolArgs = {
       paths: pathSpecsToRead,
       respectGitIgnore, // Use configuration setting
+      allow_outside_cwd: false,
     };
+
+    // If any path starts with ../, allow the tool to go outside the CWD.
+    if (
+      pathSpecsToRead.some((p) => p.startsWith('../') || p.startsWith('..\\'))
+    ) {
+      toolArgs.allow_outside_cwd = true;
+    }
 
     const toolCall = await this.client.pushToolCall({
       icon: readManyFilesTool.icon,

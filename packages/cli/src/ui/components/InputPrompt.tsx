@@ -249,7 +249,13 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
       resetCompletionState();
     },
-    [resetCompletionState, buffer, completionSuggestions, slashCommands, config],
+    [
+      resetCompletionState,
+      buffer,
+      completionSuggestions,
+      slashCommands,
+      config,
+    ],
   );
 
   // Handle clipboard image pasting with Ctrl+V
